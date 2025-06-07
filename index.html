@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers@0.7.10/dist/modules/libsodium-wrappers.min.js"></script>
 </head>
 <body class="bg-gray-100">
     <div id="root"></div>
@@ -21,15 +22,20 @@
             const [githubToken, setGithubToken] = useState("");
             const [status, setStatus] = useState("");
             const [runs, setRuns] = useState([]);
+            const [stats, setStats] = useState([]);
 
-            // Завантаження історії запусків
+            // Завантаження історії запусків і статистики
             useEffect(() => {
                 if (githubToken) {
                     axios.get("https://api.github.com/repos/grij/x-auto-like/actions/runs", {
-                        headers: { Authorization: `Bearer ${githubToken}` }
+                        headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github+json" }
                     })
                     .then(response => setRuns(response.data.workflow_runs.slice(0, 5)))
                     .catch(error => setStatus(`Помилка завантаження історії: ${error.message}`));
+
+                    axios.get("https://raw.githubusercontent.com/grij/x-auto-like/main/stats.txt")
+                    .then(response => setStats(response.data.split("\n").filter(line => line).slice(-5)))
+                    .catch(error => setStatus(`Помилка завантаження статистики: ${error.message}`));
                 }
             }, [githubToken]);
 
@@ -37,18 +43,37 @@
             const updateSecrets = async () => {
                 setStatus("Оновлення налаштувань...");
                 try {
+                    await libsodium.ready;
+                    const publicKey = "11QELOca26gUqMxELRNSb/6PqH3VS+MHlI7ahnZcAQE=";
+                    const keyId = "3380204578043523366";
+
+                    const encryptSecret = async (value) => {
+                        const keyBytes = libsodium.from_base64(publicKey, libsodium.base64_variants.ORIGINAL);
+                        const valueBytes = libsodium.from_string(value);
+                        const encryptedBytes = libsodium.crypto_box_seal(valueBytes, keyBytes);
+                        return libsodium.to_base64(encryptedBytes, libsodium.base64_variants.ORIGINAL);
+                    };
+
                     // Оновлення MAX_LIKES_PER_DAY
                     await axios.put(
                         "https://api.github.com/repos/grij/x-auto-like/actions/secrets/MAX_LIKES_PER_DAY",
-                        { encrypted_value: btoa(maxLikes), key_id: "3380204578043523366" },
-                        { headers: { Authorization: `Bearer ${githubToken}` } }
+                        {
+                            encrypted_value: await encryptSecret(maxLikes.toString()),
+                            key_id: keyId
+                        },
+                        { headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github+json" } }
                     );
+
                     // Оновлення SEARCH_QUERY
                     await axios.put(
                         "https://api.github.com/repos/grij/x-auto-like/actions/secrets/SEARCH_QUERY",
-                        { encrypted_value: btoa(searchQuery), key_id: "3380204578043523366" },
-                        { headers: { Authorization: `Bearer ${githubToken}` } }
+                        {
+                            encrypted_value: await encryptSecret(searchQuery),
+                            key_id: keyId
+                        },
+                        { headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github+json" } }
                     );
+
                     setStatus("Налаштування успішно оновлено!");
                 } catch (error) {
                     setStatus(`Помилка: ${error.message}`);
@@ -62,7 +87,7 @@
                     await axios.post(
                         "https://api.github.com/repos/grij/x-auto-like/actions/workflows/like_tweets.yml/dispatches",
                         { ref: "main" },
-                        { headers: { Authorization: `Bearer ${githubToken}` } }
+                        { headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github+json" } }
                     );
                     setStatus("Скрипт успішно запущено!");
                 } catch (error) {
@@ -121,6 +146,12 @@
                             <li key={run.id} className="text-sm">
                                 {new Date(run.created_at).toLocaleString()}: {run.status} ({run.conclusion || "N/A"})
                             </li>
+                        ))}
+                    </ul>
+                    <h2 className="mt-6 text-xl font-bold">Статистика лайків</h2>
+                    <ul className="mt-2">
+                        {stats.map((stat, index) => (
+                            <li key={index} className="text-sm">{stat}</li>
                         ))}
                     </ul>
                 </div>
