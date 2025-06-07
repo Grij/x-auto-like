@@ -1,7 +1,12 @@
 import tweepy
 import os
 from datetime import datetime
+import json
 
+with open("config.json", "r") as f:
+    config = json.load(f)
+MAX_LIKES_PER_DAY = config["max_likes_per_day"]
+SEARCH_QUERY = config["search_query"]
 # Налаштування API X
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
