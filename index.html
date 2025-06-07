@@ -9,7 +9,6 @@
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/libsodium-wrappers@0.7.13/dist/modules/libsodium-wrappers.min.js"></script>
 </head>
 <body class="bg-gray-100">
     <div id="root"></div>
@@ -23,20 +22,6 @@
             const [status, setStatus] = useState("");
             const [runs, setRuns] = useState([]);
             const [stats, setStats] = useState([]);
-            const [isLibsodiumReady, setIsLibsodiumReady] = useState(false);
-
-            // Ініціалізація libsodium
-            useEffect(() => {
-                async function initLibsodium() {
-                    try {
-                        await window.libsodium.ready;
-                        setIsLibsodiumReady(true);
-                    } catch (error) {
-                        setStatus(`Помилка ініціалізації libsodium: ${error.message}`);
-                    }
-                }
-                initLibsodium();
-            }, []);
 
             // Завантаження історії запусків і статистики
             useEffect(() => {
@@ -53,48 +38,12 @@
                 }
             }, [githubToken]);
 
-            // Оновлення секретів
-            const updateSecrets = async () => {
-                if (!isLibsodiumReady) {
-                    setStatus("Помилка: libsodium ще не завантажено");
-                    return;
-                }
-                setStatus("Оновлення налаштувань...");
-                try {
-                    const publicKey = "11QELOca26gUqMxELRNSb/6PqH3VS+MHlI7ahnZcAQE=";
-                    const keyId = "3380204578043523366";
-
-                    const encryptSecret = async (value) => {
-                        const keyBytes = window.libsodium.from_base64(publicKey, window.libsodium.base64_variants.ORIGINAL);
-                        const valueBytes = window.libsodium.from_string(value);
-                        const encryptedBytes = window.libsodium.crypto_box_seal(valueBytes, keyBytes);
-                        return window.libsodium.to_base64(encryptedBytes, window.libsodium.base64_variants.ORIGINAL);
-                    };
-
-                    // Оновлення MAX_LIKES_PER_DAY
-                    await axios.put(
-                        "https://api.github.com/repos/grij/x-auto-like/actions/secrets/MAX_LIKES_PER_DAY",
-                        {
-                            encrypted_value: await encryptSecret(maxLikes.toString()),
-                            key_id: keyId
-                        },
-                        { headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github+json" } }
-                    );
-
-                    // Оновлення SEARCH_QUERY
-                    await axios.put(
-                        "https://api.github.com/repos/grij/x-auto-like/actions/secrets/SEARCH_QUERY",
-                        {
-                            encrypted_value: await encryptSecret(searchQuery),
-                            key_id: keyId
-                        },
-                        { headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github+json" } }
-                    );
-
-                    setStatus("Налаштування успішно оновлено!");
-                } catch (error) {
-                    setStatus(`Помилка: ${error.message}`);
-                }
+            // Копіювання налаштувань для ручного оновлення
+            const copySettings = () => {
+                const settingsText = `MAX_LIKES_PER_DAY: ${maxLikes}\nSEARCH_QUERY: ${searchQuery}`;
+                navigator.clipboard.writeText(settingsText)
+                    .then(() => setStatus("Налаштування скопійовано! Вставте їх у GitHub Secrets за адресою: https://github.com/grij/x-auto-like/settings/secrets/actions"))
+                    .catch(error => setStatus(`Помилка копіювання: ${error.message}`));
             };
 
             // Запуск workflow
@@ -145,12 +94,17 @@
                         />
                     </div>
                     <button
-                        onClick={updateSecrets}
-                        disabled={!isLibsodiumReady}
-                        className={`w-full p-2 rounded mb-2 ${isLibsodiumReady ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
+                        onClick={copySettings}
+                        className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 mb-2"
                     >
-                        Зберегти налаштування
+                        Скопіювати налаштування
                     </button>
+                    <p className="text-sm text-gray-600 mb-4">
+                        Вставте скопійовані значення в GitHub Secrets за адресою:{" "}
+                        <a href="https://github.com/grij/x-auto-like/settings/secrets/actions" target="_blank" className="text-blue-500 underline">
+                            GitHub Secrets
+                        </a>
+                    </p>
                     <button
                         onClick={triggerWorkflow}
                         className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600"
