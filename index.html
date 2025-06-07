@@ -40,13 +40,13 @@
                     // Оновлення MAX_LIKES_PER_DAY
                     await axios.put(
                         "https://api.github.com/repos/grij/x-auto-like/actions/secrets/MAX_LIKES_PER_DAY",
-                        { encrypted_value: btoa(maxLikes), key_id: "A9BB26E1297B1430" },
+                        { encrypted_value: btoa(maxLikes), key_id: "3380204578043523366" },
                         { headers: { Authorization: `Bearer ${githubToken}` } }
                     );
                     // Оновлення SEARCH_QUERY
                     await axios.put(
                         "https://api.github.com/repos/grij/x-auto-like/actions/secrets/SEARCH_QUERY",
-                        { encrypted_value: btoa(searchQuery), key_id: "A9BB26E1297B1430" },
+                        { encrypted_value: btoa(searchQuery), key_id: "3380204578043523366" },
                         { headers: { Authorization: `Bearer ${githubToken}` } }
                     );
                     setStatus("Налаштування успішно оновлено!");
