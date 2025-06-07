@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X Auto Like Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [maxLikes, setMaxLikes] = useState(10);
+            const [searchQuery, setSearchQuery] = useState("#python OR from:elonmusk -is:retweet");
+            const [githubToken, setGithubToken] = useState("");
+            const [status, setStatus] = useState("");
+            const [runs, setRuns] = useState([]);
+
+            // Завантаження історії запусків
+            useEffect(() => {
+                if (githubToken) {
+                    axios.get("https://api.github.com/repos/grij/x-auto-like/actions/runs", {
+                        headers: { Authorization: `Bearer ${githubToken}` }
+                    })
+                    .then(response => setRuns(response.data.workflow_runs.slice(0, 5)))
+                    .catch(error => setStatus(`Помилка завантаження історії: ${error.message}`));
+                }
+            }, [githubToken]);
+
+            // Оновлення секретів
+            const updateSecrets = async () => {
+                setStatus("Оновлення налаштувань...");
+                try {
+                    // Оновлення MAX_LIKES_PER_DAY
+                    await axios.put(
+                        "https://api.github.com/repos/grij/x-auto-like/actions/secrets/MAX_LIKES_PER_DAY",
+                        { encrypted_value: btoa(maxLikes), key_id: "YOUR_PUBLIC_KEY_ID" },
+                        { headers: { Authorization: `Bearer ${githubToken}` } }
+                    );
+                    // Оновлення SEARCH_QUERY
+                    await axios.put(
+                        "https://api.github.com/repos/grij/x-auto-like/actions/secrets/SEARCH_QUERY",
+                        { encrypted_value: btoa(searchQuery), key_id: "YOUR_PUBLIC_KEY_ID" },
+                        { headers: { Authorization: `Bearer ${githubToken}` } }
+                    );
+                    setStatus("Налаштування успішно оновлено!");
+                } catch (error) {
+                    setStatus(`Помилка: ${error.message}`);
+                }
+            };
+
+            // Запуск workflow
+            const triggerWorkflow = async () => {
+                setStatus("Запуск скрипта...");
+                try {
+                    await axios.post(
+                        "https://api.github.com/repos/grij/x-auto-like/actions/workflows/like_tweets.yml/dispatches",
+                        { ref: "main" },
+                        { headers: { Authorization: `Bearer ${githubToken}` } }
+                    );
+                    setStatus("Скрипт успішно запущено!");
+                } catch (error) {
+                    setStatus(`Помилка: ${error.message}`);
+                }
+            };
+
+            return (
+                <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md">
+                    <h1 className="text-2xl font-bold mb-4">X Auto Like Dashboard</h1>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium">GitHub Token</label>
+                        <input
+                            type="password"
+                            value={githubToken}
+                            onChange={e => setGithubToken(e.target.value)}
+                            className="mt-1 block w-full p-2 border rounded"
+                            placeholder="Введіть GitHub PAT"
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium">Кількість лайків на день</label>
+                        <input
+                            type="number"
+                            value={maxLikes}
+                            onChange={e => setMaxLikes(e.target.value)}
+                            className="mt-1 block w-full p-2 border rounded"
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium">Пошуковий запит</label>
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="mt-1 block w-full p-2 border rounded"
+                            placeholder="Наприклад: #ukraine OR #технології"
+                        />
+                    </div>
+                    <button
+                        onClick={updateSecrets}
+                        className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 mb-2"
+                    >
+                        Зберегти налаштування
+                    </button>
+                    <button
+                        onClick={triggerWorkflow}
+                        className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600"
+                    >
+                        Запустити скрипт
+                    </button>
+                    <p className="mt-4 text-sm">{status}</p>
+                    <h2 className="mt-6 text-xl font-bold">Останні запуски</h2>
+                    <ul className="mt-2">
+                        {runs.map(run => (
+                            <li key={run.id} className="text-sm">
+                                {new Date(run.created_at).toLocaleString()}: {run.status} ({run.conclusion || "N/A"})
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById("root"));
+    </script>
+</body>
+</html>
