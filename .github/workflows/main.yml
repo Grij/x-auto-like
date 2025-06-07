@@ -23,4 +23,6 @@ jobs:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           ACCESS_TOKEN_SECRET: ${{ secrets.ACCESS_TOKEN_SECRET }}
           BEARER_TOKEN: ${{ secrets.BEARER_TOKEN }}
+          MAX_LIKES_PER_DAY: ${{ secrets.MAX_LIKES_PER_DAY }}
+          SEARCH_QUERY: ${{ secrets.SEARCH_QUERY }}
         run: python auto_like.py
